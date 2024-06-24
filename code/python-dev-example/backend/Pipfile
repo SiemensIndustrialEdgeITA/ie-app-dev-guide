@@ -1,0 +1,15 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "==3.0.0"
+paho-mqtt = "==1.6.1"
+psycopg = {extras = ["binary", "pool"], version = "*"}
+flask-cors = "==4.0.0"
+
+[dev-packages]
+
+[requires]
+python_version = "3.11"

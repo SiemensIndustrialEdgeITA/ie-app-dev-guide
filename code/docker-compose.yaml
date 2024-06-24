@@ -1,0 +1,53 @@
+version: "2.4"
+
+services:
+  my-react-demo:
+    image: my-react-demo:latest
+    restart: unless-stopped
+    environment: 
+      - TZ=Europe/Rome
+      # - REACT_APP_BASE_URL=http://my-python-demo:5000
+    mem_limit: 100m
+    networks:
+      - proxy-redirect
+    ports:
+      - 18080:80
+
+  my-python-demo:
+    image: my-python-demo:latest
+    restart: unless-stopped
+    environment: 
+      - TZ=Europe/Rome
+      # - POSTGRES_HOST=my-postgres-demo
+      # - POSTGRES_USER=siemens
+      # - POSTGRES_PASSWORD=myPassword
+    volumes:
+      - ./cfg-data/:/cfg-data/
+    mem_limit: 100m
+    networks:
+      - proxy-redirect
+    # ports:
+    #   - 5000:5000
+
+  my-postgres-demo:
+    image: my-postgres-demo:latest
+    restart: unless-stopped
+    environment: 
+      - TZ=Europe/Rome
+      - POSTGRES_PASSWORD=myPassword
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    mem_limit: 100m
+    networks:
+      - proxy-redirect
+    ports:
+      - 15432:5432
+
+volumes:
+  postgres-data:
+    - name: postgres-data
+
+networks:
+  proxy-redirect:
+    name: proxy-redirect
+    external: true

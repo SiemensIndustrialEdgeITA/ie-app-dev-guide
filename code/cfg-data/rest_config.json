@@ -1,0 +1,5 @@
+{
+    "postgresHost": "my-postgres-demo",
+    "postgresUser": "siemens",
+    "postgresPassword": "myPassword"
+}
