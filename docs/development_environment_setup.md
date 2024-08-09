@@ -70,10 +70,10 @@ sudo rm -rf /var/lib/containerd
     - Add Docker's official GPG key:
 
         ```
-        sudo apt-get update
-        sudo apt-get install ca-certificates curl
-        sudo install -m 0755 -d /etc/apt/keyrings
-        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        sudo apt-get update && \
+        sudo apt-get install -y ca-certificates curl && \
+        sudo install -m 0755 -d /etc/apt/keyrings && \
+        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && \
         sudo chmod a+r /etc/apt/keyrings/docker.asc
         ```
     - Add the repository to Apt sources:
@@ -81,7 +81,7 @@ sudo rm -rf /var/lib/containerd
         echo \
         "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
         $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null && \
         sudo apt-get update
         ```
 
@@ -124,13 +124,13 @@ The Docker daemon binds to a Unix socket; by default it's the `root` user that o
 
 To enable Docker auto-start:
 ```
-sudo systemctl enable docker.service
+sudo systemctl enable docker.service  && \
 sudo systemctl enable containerd.service
 ```
 
 To disable Docker auto-start:
 ```
-sudo systemctl disable docker.service
+sudo systemctl disable docker.service  && \
 sudo systemctl disable containerd.service
 ```
 
@@ -139,14 +139,51 @@ sudo systemctl disable containerd.service
 The **Industrial Edge App Publisher** reuires to have access to the docker socket; to allow this, some configuration has to be applied on the machine where you are running Docker, in particular, you have to expose the Docker socket for external access.
 
 - External **unsafe** access:
-  - Edit the default Docker configuration:
-    - Run:
-      ```sudo systemctl edit docker.service```
-    - Find the line:
-     ```ExecStart=/usr/bin/dockerd ...```
-    - Edit the line and keep only:
-     ```ExecStart=/usr/bin/dockerd```
-    - Save the file and close it by pressing `ctrl` + `o` → `Enter` → `ctrl` + `x`
+  - Edit Docker service configuration:
+    Based on your preferences and needs, you can choose one of these two ways to update the Docker service configuration:
+    - Edit the Docker service configuration by modifying the unit file snippet (1st alternative):
+      - Run:
+        
+        ```
+        sudo systemctl edit docker.service
+        ```
+      
+      - Find the line:
+        
+        ```
+        ExecStart=/usr/bin/dockerd ...
+        ```
+      
+      - Edit the line and keep only:
+        
+        ```
+        ExecStart=/usr/bin/dockerd
+        ```
+      
+      - Save the file and close it by pressing `ctrl` + `o` → `Enter` → `ctrl` + `x`
+    
+    - Edit the Docker service configuration by modifying the full unit file instead of creating a snippet (2nd alternative):
+
+      - Run:
+
+        ```
+        sudo systemctl edit --full docker.service
+        ```
+
+      - Find the line:
+        ```
+        ExecStart=/usr/bin/dockerd ...
+        ```
+
+      - Edit the line as:
+        
+        ```
+        ExecStart=
+        ExecStart=/usr/bin/dockerd --config-file /etc/docker/daemon.json
+        ```
+
+      - Save the file and close it by pressing `ctrl` + `o` → `Enter` → `ctrl` + `x`
+  
   - Open the daemon configuration file and edit it:
 
     ```bash
@@ -156,14 +193,25 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
   - Add the following content (the port `2375` is the default one):
 
     ```json
-    "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]
+    {
+      "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"]
+    }
     ```
 
-  - After making changes to the Docker daemon configuration, restart the Docker service:
+    > **Note:** If the file `/etc/docker/daemon.json` already exists, just add the `hosts` key and its value to the file.
 
-    ```bash
-    sudo systemctl restart docker
-    ```
+  - After making changes to the Docker daemon configuration:
+    - Reload the daemon:
+      
+      ```bash
+      sudo systemctl daemon-reload
+      ```
+    
+    - Restart the Docker service:
+      
+      ```bash
+      sudo systemctl restart docker
+      ```
 
   - Ensure that your firewall allows incoming traffic on the Docker API port (default is `2375`). Adjust your firewall rules accordingly:
 
@@ -178,7 +226,9 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
     ```
 
   > **Note 1:** Exposing the Docker API without proper authentication and encryption is a security risk. It's recommended to use TLS for securing the communication between the client and the Docker daemon.
-  > **Note 2:** In order to allow access to the docker socket, it is possible to also edit the Docker service: `sudo systemctl edit docker.service` and add `ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375` under `[Service]`.
+
+  > **Note 2:** You can also allow the access to the docker socket by editing the Docker service: `sudo systemctl edit docker.service` and add `ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock -H tcp://0.0.0.0:2375` under `[Service]`.
+  
   > **Note 3:** Another way to expose the socket is to edit the file `/lib/systemd/system/docker.service`, find the line `ExecStart=/usr/bin/docker daemon -H fd://` and add at the end `-H tcp://0.0.0.0:2375`.
 
 - External **safe** access:
@@ -231,19 +281,30 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
   - Configure Docker Daemon by adding the following *key-value* pairs (edit the configuration based on your deployment setup):
 
     ```json
-    "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"],
-    "tls": true,
-    "tlsverify": true,
-    "tlscacert": "/path/to/your/cert/ca.pem",
-    "tlscert": "/path/to/your/cert/server-cert.pem",
-    "tlskey": "/path/to/your/cert/server-key.pem"
+    {
+      "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"],
+      "tls": true,
+      "tlsverify": true,
+      "tlscacert": "/path/to/your/cert/ca.pem",
+      "tlscert": "/path/to/your/cert/server-cert.pem",
+      "tlskey": "/path/to/your/cert/server-key.pem"
+    }
     ```
 
-  - After making changes to the Docker daemon configuration, restart the Docker service:
+    > **Note:** If the file `/etc/docker/daemon.json` already exists, just add all keys and their values to the file.
 
-    ```bash
-    sudo systemctl restart docker
-    ```
+  - After making changes to the Docker daemon configuration:
+    - Reload the daemon:
+      
+      ```bash
+      sudo systemctl daemon-reload
+      ```
+    
+    - Restart the Docker service:
+      
+      ```bash
+      sudo systemctl restart docker
+      ```
 
   - Ensure that your firewall allows incoming traffic on the Docker API port (default is `2375`). Adjust your firewall rules accordingly:
 
@@ -258,6 +319,7 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
     ```
 
   > **Note 1:** These changes can be also applied without changing the `daemon.json` file. To do this, run `sudo systemctl edit docker.service` and modify the line `ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock` by adding at the end `-H tcp://0.0.0.0:2375 --tlsverify --tlscacert=<location of ca certificate> --tlscert=<location of server certificate> --tlskey=<location of server key>`.
+  
   > **Note 2:** To have a better understanding of TLS certificates [check this guide](https://github.com/SiemensIndustrialEdgeITA/edge-certificates-guide).
 
 ## Download the Industrial Edge App Publisher
@@ -267,6 +329,7 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
 The **Industrial Edge App Publisher** can be downloaded from the [Industrial Edge Hub](https://iehub.eu1.edge.siemens.cloud/). Once you log in with your credentials, you have to go under **Download Software**, then select the **Developer Tools** tab and then download the **Industrial Edge App Publisher** that suits your needs.
 
 > **Note 1:** You can find the **Industrial Edge App Publisher** full documentation [here](https://support.industry.siemens.com/cs/document/109814441/industrial-edge-app-publisher-operation).
+
 > **Note 2:** The easyest way to develop and publish Industrial Edge applications is via Ubuntu Desktop, that can be used both as development environment and to publish the applications. This allows you to avoid further configurations that might be required when using Docker or the IE App Publisher on Windows.
 
 ![Image](./images/download_edge_publisher.png)
