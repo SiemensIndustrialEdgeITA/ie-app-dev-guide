@@ -136,54 +136,53 @@ sudo systemctl disable containerd.service
 
 ## Expose Docker socket on TCP port
 
-The **Industrial Edge App Publisher** reuires to have access to the docker socket; to allow this, some configuration has to be applied on the machine where you are running Docker, in particular, you have to expose the Docker socket for external access.
+The **Industrial Edge App Publisher** reuires to have access to the docker socket; to allow this, some configuration has to be applied on the machine where you are running Docker, in particular, you have to expose the Docker socket for external access. The Docker socket can be exposed both via `http` (unsafe access) or `https` (safe access).
 
-- External **unsafe** access:
-  - Edit Docker service configuration:
-    Based on your preferences and needs, you can choose one of these two ways to update the Docker service configuration:
-    - Edit the Docker service configuration by modifying the unit file snippet (1st alternative):
-      - Run:
-        
-        ```
-        sudo systemctl edit docker.service
-        ```
+- Edit Docker service configuration (based on your preferences and needs, you can choose one of these two ways to update the Docker service configuration):
+  - Edit the Docker service configuration by modifying the unit file snippet (1st alternative):
+    - Run:
       
-      - Find the line:
-        
-        ```
-        ExecStart=/usr/bin/dockerd ...
-        ```
-      
-      - Edit the line and keep only:
-        
-        ```
-        ExecStart=/usr/bin/dockerd
-        ```
-      
-      - Save the file and close it by pressing `ctrl` + `o` → `Enter` → `ctrl` + `x`
+      ```
+      sudo systemctl edit docker.service
+      ```
     
-    - Edit the Docker service configuration by modifying the full unit file instead of creating a snippet (2nd alternative):
-
-      - Run:
-
-        ```
-        sudo systemctl edit --full docker.service
-        ```
-
-      - Find the line:
-        ```
-        ExecStart=/usr/bin/dockerd ...
-        ```
-
-      - Edit the line as:
-        
-        ```
-        ExecStart=
-        ExecStart=/usr/bin/dockerd --config-file /etc/docker/daemon.json
-        ```
-
-      - Save the file and close it by pressing `ctrl` + `o` → `Enter` → `ctrl` + `x`
+    - Find the line:
+      
+      ```
+      ExecStart=/usr/bin/dockerd ...
+      ```
+    
+    - Edit the line and keep only:
+      
+      ```
+      ExecStart=/usr/bin/dockerd
+      ```
+    
+    - Save the file and close it by pressing `ctrl` + `o` → `Enter` → `ctrl` + `x`
   
+  - Edit the Docker service configuration by modifying the full unit file instead of creating a snippet (2nd alternative):
+
+    - Run:
+
+      ```
+      sudo systemctl edit --full docker.service
+      ```
+
+    - Find the line:
+      ```
+      ExecStart=/usr/bin/dockerd ...
+      ```
+
+    - Edit the line as:
+      
+      ```
+      ExecStart=
+      ExecStart=/usr/bin/dockerd --config-file /etc/docker/daemon.json
+      ```
+
+    - Save the file and close it by pressing `ctrl` + `o` → `Enter` → `ctrl` + `x`
+
+- Enable the external **unsafe** access:  
   - Open the daemon configuration file and edit it:
 
     ```bash
@@ -231,12 +230,13 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
   
   > **Note 3:** Another way to expose the socket is to edit the file `/lib/systemd/system/docker.service`, find the line `ExecStart=/usr/bin/docker daemon -H fd://` and add at the end `-H tcp://0.0.0.0:2375`.
 
-- External **safe** access:
+- Enable the external **safe** access:
   - Generate TLS Certificates (**CA** and **Server**):
 
     ```bash
     # Choose a folder to store your certs
     mkdir -p /path/to/your/cert
+    cd /path/to/your/cert
     
     # Generate the CA certs
     openssl genrsa -aes256 -out ca-key.pem 4096
@@ -282,7 +282,7 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
 
     ```json
     {
-      "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2375"],
+      "hosts": ["unix:///var/run/docker.sock", "tcp://0.0.0.0:2376"],
       "tls": true,
       "tlsverify": true,
       "tlscacert": "/path/to/your/cert/ca.pem",
@@ -306,10 +306,10 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
       sudo systemctl restart docker
       ```
 
-  - Ensure that your firewall allows incoming traffic on the Docker API port (default is `2375`). Adjust your firewall rules accordingly:
+  - Ensure that your firewall allows incoming traffic on the Docker API port (default tls is `2376`). Adjust your firewall rules accordingly:
 
     ```bash
-    sudo ufw allow 2375
+    sudo ufw allow 2376
     ```
 
   - Verify the new firewall rules:
@@ -318,7 +318,16 @@ The **Industrial Edge App Publisher** reuires to have access to the docker socke
     sudo ufw status verbose
     ```
 
-  > **Note 1:** These changes can be also applied without changing the `daemon.json` file. To do this, run `sudo systemctl edit docker.service` and modify the line `ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock` by adding at the end `-H tcp://0.0.0.0:2375 --tlsverify --tlscacert=<location of ca certificate> --tlscert=<location of server certificate> --tlskey=<location of server key>`.
+  - Test your certificates:
+    ```
+    docker --tlsverify \
+      --tlscacert=/path/to/your/cert/ca.pem \
+      --tlscert=/path/to/your/cert/cert.pem \
+      --tlskey=/path/to/your/cert/key.pem \
+      -H=tcp://127.0.0.1:2376 info
+    ```
+
+  > **Note 1:** These changes can be also applied without changing the `daemon.json` file. To do this, run `sudo systemctl edit docker.service` and modify the line `ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock` by adding at the end `-H tcp://0.0.0.0:2376 --tlsverify --tlscacert=<location of ca certificate> --tlscert=<location of server certificate> --tlskey=<location of server key>`.
   
   > **Note 2:** To have a better understanding of TLS certificates [check this guide](https://github.com/SiemensIndustrialEdgeITA/edge-certificates-guide).
 
@@ -368,14 +377,25 @@ This section describes how to connect to a Docker Engine to be able to integrate
     
     ![connect_app_pub_to_docker](./images/connect_app_pub_to_docker.png)
 
-2. Choose the application protocol that the Docker Engine uses from the drop-down menu.
-3. Enter the IP and the port of the Docker Engine in the respective input fields. By default, port `2375` is set but can be changed. To check for a connection with the Docker Engine, press the refresh button. There is no message after the check.
-4. For a secure communication, activate the TLS (Transport Layer Security) option flag and import the required files that were created [here](#expose-docker-socket-on-tcp-port) and select `https` instead of `http`:
-   - Select Ca file: `ca.pem`
-   - Select Cert file: `cert.pem`
-   - Select Key file: `key.pem`
-5. Click on the "Connect" button.
-   The connection to the Docker Engine is established.
+2. For **unsafe** communication:
+   1. Choose the application protocol `http` from the drop-down menu.
+   2. Enter the IP and the port of the Docker Engine in the respective input fields. The default `http` port is `2375`.
+   3. Type the URL or IP of an IEM into the "Edge Management URL" input field.
+   4. Click the "Connect" button.
+
+      ![ie_app_publisher_config](./images/ie_app_publisher_config.png)
+
+3. For **safe** communication:
+   1. Choose the application protocol `https` from the drop-down menu.
+   2. Enter the IP and the port of the Docker Engine in the respective input fields. The default `https` port is `2376`.
+   3. Select the *Use TLS* box.
+   4. Select the requested `.pem` files that were created [here](#expose-docker-socket-on-tcp-port):
+      - Select Ca file: `ca.pem`
+      - Select Cert file: `cert.pem`
+      - Select Key file: `key.pem`
+   5. Click the "Connect" button.
+
+      ![ie_app_publisher_tls_config](./images/ie_app_publisher_tls_config.png)
 
 ### Connecting to an IEM instance
 
@@ -388,6 +408,5 @@ You can find more detailed information about the IEM in the ["Industrial Edge Ma
    ![ie_app_publisher_connect_to_iem](./images/ie_app_publisher_connect_to_iem.png)
 
 2. Type the URL or IP of an IEM into the "Edge Management URL" input field.
-3. Click on the "Connect" button.
-   The IE App Publisher is connected to the Edge Management with the URL or IP in the input
-field.
+
+3. Click the "Connect" button.
