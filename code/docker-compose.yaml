@@ -2,6 +2,8 @@ version: "2.4"
 
 services:
   my-react-demo:
+    # build:
+    #   context: ./react-dev-example/frontend
     image: my-react-demo:latest
     restart: unless-stopped
     environment: 
@@ -14,6 +16,8 @@ services:
       - 18080:80
 
   my-python-demo:
+    # build:
+    #     context: ./python-dev-example/backend
     image: my-python-demo:latest
     restart: unless-stopped
     environment: 
@@ -30,6 +34,8 @@ services:
     #   - 5000:5000
 
   my-postgres-demo:
+    # build:
+    #     context: ./database-postgres
     image: my-postgres-demo:latest
     restart: unless-stopped
     environment: 
@@ -45,7 +51,7 @@ services:
 
 volumes:
   postgres-data:
-    - name: postgres-data
+    name: postgres-data
 
 networks:
   proxy-redirect:
